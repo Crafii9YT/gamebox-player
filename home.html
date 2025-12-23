@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <title>GameBox</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
 <script type="module">
@@ -21,11 +19,12 @@ import {
   getFirestore,
   doc,
   getDoc,
-  updateDoc,
   setDoc,
+  updateDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+/* FIREBASE */
 const firebaseConfig = {
   apiKey: "AIzaSyDulFQbzyizMXE1i7uBD5RVaR6bQa0SEfU",
   authDomain: "gamebox-681ef.firebaseapp.com",
@@ -38,6 +37,7 @@ const db = getFirestore(app);
 
 let user, data;
 
+/* AUTH */
 onAuthStateChanged(auth, async (u) => {
   if (!u) return location.href = "index.html";
   user = u;
@@ -50,101 +50,145 @@ onAuthStateChanged(auth, async (u) => {
       username: "user" + Math.floor(10000 + Math.random() * 90000),
       ageStatus: "<13",
       ageChecked: false,
-      lastUsernameChange: 0
+      premium: false,
+      theme: "dark",
+      lastUsernameChange: 0,
+      createdAt: serverTimestamp()
     });
     location.reload();
     return;
   }
 
   data = snap.data();
+
+  // ADMIN OVERRIDE
+  if (user.email === "crafiii60@gmail.com") {
+    await updateDoc(ref, { ageStatus: "13+", ageChecked: true });
+    data.ageStatus = "13+";
+    data.ageChecked = true;
+  }
+
+  applyTheme();
   render();
 });
 
+/* RENDER */
 function render() {
   username.textContent = data.username;
   ageBadge.textContent = data.ageStatus;
 
+  profileUsername.textContent = data.username;
+  profileAge.textContent = data.ageStatus;
+  profileVerified.textContent = data.ageChecked ? "Yes" : "No";
+  profileUID.textContent = user.uid;
+  profileCreated.textContent = user.metadata.creationTime;
+  profileProvider.textContent = user.providerData[0]?.providerId;
+  profilePremium.textContent = data.premium ? "Active ⭐" : "No";
+  profileTheme.textContent = data.theme;
+  profileLastName.textContent = data.lastUsernameChange
+    ? new Date(data.lastUsernameChange).toLocaleDateString()
+    : "Never";
+
+  settingsTheme.value = data.theme;
+  premiumBtn.textContent = data.premium ? "Premium Active ⭐" : "Upgrade to Premium";
+
   if (data.ageChecked) ageBanner.style.display = "none";
 }
 
+/* THEME */
+function applyTheme() {
+  document.body.dataset.theme = data.theme;
+}
+window.changeTheme = async (v) => {
+  data.theme = v;
+  applyTheme();
+  await updateDoc(doc(db, "users", user.uid), { theme: v });
+};
+
+/* USERNAME CHANGE */
+window.changeUsername = async () => {
+  const newName = newUsername.value.trim();
+  const pw = confirmPassword.value;
+  if (!newName || !pw) return alert("Missing data");
+
+  if (
+    (newName === "Crafii9" || newName === "Crafii9YT") &&
+    user.email !== "crafiii60@gmail.com"
+  ) return alert("Username reserved");
+
+  if (Date.now() - data.lastUsernameChange < 2592000000)
+    return alert("Only every 30 days");
+
+  const cred = EmailAuthProvider.credential(user.email, pw);
+  await reauthenticateWithCredential(user, cred);
+
+  await updateDoc(doc(db, "users", user.uid), {
+    username: newName,
+    lastUsernameChange: Date.now()
+  });
+
+  data.username = newName;
+  render();
+  alert("Username updated");
+};
+
+/* PREMIUM (FAKE UPGRADE) */
+window.buyPremium = async () => {
+  await updateDoc(doc(db, "users", user.uid), { premium: true });
+  data.premium = true;
+  render();
+};
+
+/* LOGOUT */
 window.logout = async () => {
   await signOut(auth);
   location.href = "index.html";
 };
 
-// AGE CHECK FLOW
-window.startAgeCheck = () => {
-  step1.style.display = "none";
-  step2.style.display = "block";
-};
-
-window.submitAge = async () => {
-  if (!confirmAge.checked) return alert("Bitte bestätigen");
-  const birth = new Date(birthdate.value);
-  const age = (Date.now() - birth) / 31557600000;
-
-  if (age < 5 || age > 100) {
-    alert("Ungültiges Alter");
-    return;
-  }
-
-  const status = age >= 13 ? "13+" : "<13";
-
-  await updateDoc(doc(db, "users", user.uid), {
-    ageStatus: status,
-    ageChecked: true,
-    ageVerifiedAt: serverTimestamp()
-  });
-
-  data.ageChecked = true;
-  data.ageStatus = status;
-  ageModal.style.display = "none";
-  render();
-};
+/* MODALS */
+window.openSettings = () => settings.style.display = "flex";
+window.openProfile = () => profile.style.display = "flex";
+window.openShop = () => shop.style.display = "flex";
+window.closeModal = (id) => id.style.display = "none";
 </script>
 
 <style>
 :root {
   --bg: #0f0f14;
-  --glass: rgba(255,255,255,.08);
+  --panel: rgba(255,255,255,.08);
   --border: rgba(255,255,255,.15);
-  --accent: #6366f1;
 }
-* { box-sizing: border-box; }
 body {
   margin: 0;
   font-family: Inter, sans-serif;
-  background: radial-gradient(circle at top, #1a1a2e, var(--bg));
+  background: var(--bg);
   color: white;
   display: flex;
+}
+body[data-theme="light"] {
+  --bg: #f4f4f5;
+  --panel: rgba(0,0,0,.06);
+  --border: rgba(0,0,0,.12);
+  color: black;
 }
 
 /* SIDEBAR */
 .sidebar {
   width: 240px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
   padding: 20px;
-  background: var(--glass);
-  backdrop-filter: blur(14px);
+  background: var(--panel);
   border-right: 1px solid var(--border);
 }
-.sidebar img {
+.nav { flex: 1; }
+button {
   width: 100%;
-  margin-bottom: 30px;
-}
-.nav button {
-  width: 100%;
-  padding: 12px;
+  padding: 10px;
   margin-bottom: 10px;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: white;
-  border-radius: 12px;
 }
-.nav .premium {
-  background: linear-gradient(135deg, gold, orange);
-  color: black;
-  font-weight: 700;
-}
+.premium { background: gold; color: black; }
 
 /* MAIN */
 .main { flex: 1; }
@@ -154,29 +198,18 @@ body {
   height: 64px;
   display: flex;
   align-items: center;
-  padding: 0 30px;
-  background: var(--glass);
-  backdrop-filter: blur(14px);
+  padding: 0 20px;
   border-bottom: 1px solid var(--border);
 }
 .search {
   margin: auto;
   padding: 8px 14px;
-  border-radius: 20px;
-  border: none;
-  background: #1f1f2f;
-  color: white;
-}
-.userbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 .badge {
-  background: #27273a;
-  padding: 4px 8px;
-  border-radius: 999px;
   font-size: 12px;
+  padding: 4px 8px;
+  background: #27273a;
+  border-radius: 999px;
 }
 
 /* MODALS */
@@ -185,24 +218,20 @@ body {
   inset: 0;
   background: rgba(0,0,0,.7);
   display: none;
-  align-items: center;
   justify-content: center;
+  align-items: center;
 }
 .card {
-  width: 420px;
+  width: 460px;
   padding: 24px;
-  background: var(--glass);
-  backdrop-filter: blur(20px);
+  background: var(--panel);
   border-radius: 20px;
-  border: 1px solid var(--border);
 }
-
-/* AGE BANNER */
 .age-banner {
-  background: linear-gradient(135deg, #7c3aed, #6366f1);
-  padding: 12px;
-  border-radius: 14px;
   margin: 20px;
+  padding: 14px;
+  background: linear-gradient(135deg, #7c3aed, #6366f1);
+  border-radius: 14px;
 }
 </style>
 </head>
@@ -213,54 +242,63 @@ body {
   <img src="gamebox_logo1.png">
   <div class="nav">
     <button>Homepage</button>
-    <button>Profile</button>
-    <button>Shop</button>
-    <button class="premium">Premium</button>
+    <button onclick="openProfile()">Profile</button>
+    <button onclick="openShop()">Shop</button>
   </div>
+  <button class="premium" id="premiumBtn" onclick="buyPremium()">Upgrade to Premium</button>
 </div>
 
 <div class="main">
   <div class="topbar">
-    <input class="search" placeholder="Search...">
-    <div class="userbox">
-      <span id="username"></span>
-      <span class="badge" id="ageBadge"></span>
-      <button onclick="settings.style.display='flex'">⋯</button>
-    </div>
+    <input class="search" placeholder="Search">
+    <span id="username"></span>
+    <span class="badge" id="ageBadge"></span>
+    <button onclick="openSettings()">⋯</button>
   </div>
 
-  <div class="age-banner" id="ageBanner">
-    Age verification required
-    <button onclick="ageModal.style.display='flex'">Continue</button>
-  </div>
+  <div class="age-banner" id="ageBanner">Age verification required</div>
 </div>
 
 <!-- SETTINGS -->
 <div class="modal" id="settings">
   <div class="card">
     <h2>Settings</h2>
+    <select id="settingsTheme" onchange="changeTheme(this.value)">
+      <option value="dark">Dark</option>
+      <option value="light">Light</option>
+    </select>
+    <input id="newUsername" placeholder="New username">
+    <input id="confirmPassword" type="password" placeholder="Password">
+    <button onclick="changeUsername()">Change Username</button>
     <button onclick="logout()">Logout</button>
-    <button onclick="settings.style.display='none'">Close</button>
+    <button onclick="closeModal(settings)">Close</button>
   </div>
 </div>
 
-<!-- AGE CHECK -->
-<div class="modal" id="ageModal">
+<!-- PROFILE -->
+<div class="modal" id="profile">
   <div class="card">
-    <div id="step1">
-      <h3>Age Verification</h3>
-      <p>We must verify your age to comply with regulations.</p>
-      <button onclick="startAgeCheck()">Continue</button>
-    </div>
+    <h2>Profile</h2>
+    <p>Username: <span id="profileUsername"></span></p>
+    <p>Age: <span id="profileAge"></span></p>
+    <p>Verified: <span id="profileVerified"></span></p>
+    <p>UID: <span id="profileUID"></span></p>
+    <p>Created: <span id="profileCreated"></span></p>
+    <p>Provider: <span id="profileProvider"></span></p>
+    <p>Premium: <span id="profilePremium"></span></p>
+    <p>Theme: <span id="profileTheme"></span></p>
+    <p>Last Username Change: <span id="profileLastName"></span></p>
+    <button onclick="closeModal(profile)">Close</button>
+  </div>
+</div>
 
-    <div id="step2" style="display:none;">
-      <input type="date" id="birthdate">
-      <label>
-        <input type="checkbox" id="confirmAge">
-        I confirm this is correct
-      </label>
-      <button onclick="submitAge()">Verify</button>
-    </div>
+<!-- SHOP -->
+<div class="modal" id="shop">
+  <div class="card">
+    <h2>Shop</h2>
+    <p>GameBox Premium ⭐</p>
+    <button onclick="buyPremium()">Buy Premium</button>
+    <button onclick="closeModal(shop)">Close</button>
   </div>
 </div>
 
