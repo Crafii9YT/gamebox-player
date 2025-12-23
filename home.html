@@ -5,6 +5,9 @@
 <title>GameBox</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
@@ -18,8 +21,8 @@ import {
   getFirestore,
   doc,
   getDoc,
-  setDoc,
   updateDoc,
+  setDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -33,178 +36,173 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-let currentUser;
-let userData;
+let user, data;
 
-// 🔐 AUTH CHECK
-onAuthStateChanged(auth, async (user) => {
-  if (!user) {
-    location.href = "index.html";
-    return;
-  }
+onAuthStateChanged(auth, async (u) => {
+  if (!u) return location.href = "index.html";
+  user = u;
 
-  currentUser = user;
-  const ref = doc(db, "users", user.uid);
+  const ref = doc(db, "users", u.uid);
   const snap = await getDoc(ref);
 
   if (!snap.exists()) {
-    const randomName = "user" + Math.floor(10000 + Math.random() * 90000);
-    userData = {
-      username: randomName,
+    await setDoc(ref, {
+      username: "user" + Math.floor(10000 + Math.random() * 90000),
       ageStatus: "<13",
       ageChecked: false,
       lastUsernameChange: 0
-    };
-    await setDoc(ref, userData);
-  } else {
-    userData = snap.data();
+    });
+    location.reload();
+    return;
   }
 
-  renderUser();
+  data = snap.data();
+  render();
 });
 
-// 🧠 RENDER USER
-function renderUser() {
-  usernameText.textContent = userData.username;
-  ageTag.textContent = userData.ageStatus;
-  settingsUsername.textContent = userData.username;
-  settingsEmail.textContent = currentUser.email;
-  settingsAge.textContent = userData.ageStatus;
-  settingsChecked.textContent = userData.ageChecked ? "✔ Checked" : "❌ Not checked";
+function render() {
+  username.textContent = data.username;
+  ageBadge.textContent = data.ageStatus;
 
-  if (userData.ageChecked) {
-    ageBanner.style.display = "none";
-  }
+  if (data.ageChecked) ageBanner.style.display = "none";
 }
 
-// 🚪 LOGOUT
 window.logout = async () => {
   await signOut(auth);
   location.href = "index.html";
 };
 
-// ⚙ SETTINGS
-window.openSettings = () => settings.style.display = "flex";
-window.closeSettings = () => settings.style.display = "none";
-
-// 👶 AGE CHECK
+// AGE CHECK FLOW
 window.startAgeCheck = () => {
-  agePopup.style.display = "flex";
+  step1.style.display = "none";
+  step2.style.display = "block";
 };
 
-window.finishAgeCheck = async () => {
+window.submitAge = async () => {
+  if (!confirmAge.checked) return alert("Bitte bestätigen");
   const birth = new Date(birthdate.value);
-  const age = (Date.now() - birth) / (1000 * 60 * 60 * 24 * 365);
+  const age = (Date.now() - birth) / 31557600000;
 
-  const newStatus = age >= 13 ? "13+" : "<13";
-
-  await updateDoc(doc(db, "users", currentUser.uid), {
-    ageStatus: newStatus,
-    ageChecked: true
-  });
-
-  userData.ageStatus = newStatus;
-  userData.ageChecked = true;
-
-  agePopup.style.display = "none";
-  renderUser();
-};
-
-// ✏ USERNAME CHANGE
-window.changeUsername = async () => {
-  const newName = newUsername.value.trim();
-  const password = confirmPassword.value;
-
-  if (!newName || !password) return alert("Fehlende Daten");
-
-  // Spezialregel
-  if (
-    (newName === "Crafii9" || newName === "Crafii9YT") &&
-    currentUser.email !== "crafiii60@gmail.com"
-  ) {
-    return alert("Dieser Username ist reserviert.");
+  if (age < 5 || age > 100) {
+    alert("Ungültiges Alter");
+    return;
   }
 
-  const now = Date.now();
-  if (now - (userData.lastUsernameChange || 0) < 2592000000) {
-    return alert("Username nur alle 30 Tage änderbar.");
-  }
+  const status = age >= 13 ? "13+" : "<13";
 
-  const cred = EmailAuthProvider.credential(currentUser.email, password);
-  await reauthenticateWithCredential(currentUser, cred);
-
-  await updateDoc(doc(db, "users", currentUser.uid), {
-    username: newName,
-    lastUsernameChange: now
+  await updateDoc(doc(db, "users", user.uid), {
+    ageStatus: status,
+    ageChecked: true,
+    ageVerifiedAt: serverTimestamp()
   });
 
-  userData.username = newName;
-  renderUser();
-  alert("Username geändert!");
+  data.ageChecked = true;
+  data.ageStatus = status;
+  ageModal.style.display = "none";
+  render();
 };
 </script>
 
 <style>
+:root {
+  --bg: #0f0f14;
+  --glass: rgba(255,255,255,.08);
+  --border: rgba(255,255,255,.15);
+  --accent: #6366f1;
+}
+* { box-sizing: border-box; }
 body {
   margin: 0;
-  font-family: Arial, sans-serif;
-  background: #121218;
+  font-family: Inter, sans-serif;
+  background: radial-gradient(circle at top, #1a1a2e, var(--bg));
   color: white;
   display: flex;
 }
+
+/* SIDEBAR */
 .sidebar {
-  width: 220px;
-  background: #1c1c28;
+  width: 240px;
   padding: 20px;
+  background: var(--glass);
+  backdrop-filter: blur(14px);
+  border-right: 1px solid var(--border);
 }
 .sidebar img {
   width: 100%;
-  margin-bottom: 20px;
+  margin-bottom: 30px;
 }
-.sidebar button {
+.nav button {
   width: 100%;
-  padding: 10px;
-  margin-top: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: white;
+  border-radius: 12px;
 }
-.premium {
-  background: gold;
+.nav .premium {
+  background: linear-gradient(135deg, gold, orange);
   color: black;
-  font-weight: bold;
+  font-weight: 700;
 }
-.main {
-  flex: 1;
-}
+
+/* MAIN */
+.main { flex: 1; }
+
+/* TOPBAR */
 .topbar {
-  height: 60px;
-  background: #1c1c28;
+  height: 64px;
   display: flex;
   align-items: center;
-  padding: 0 20px;
+  padding: 0 30px;
+  background: var(--glass);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
 }
-.topbar input {
+.search {
   margin: auto;
-  padding: 6px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  border: none;
+  background: #1f1f2f;
+  color: white;
 }
-.user {
-  margin-right: 10px;
+.userbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.popup {
+.badge {
+  background: #27273a;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+/* MODALS */
+.modal {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,.7);
   display: none;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
 }
-.box {
-  background: #1c1c28;
-  padding: 20px;
-  width: 400px;
+.card {
+  width: 420px;
+  padding: 24px;
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  border: 1px solid var(--border);
 }
-.banner {
-  background: #9333ea;
-  padding: 10px;
-  margin-bottom: 10px;
+
+/* AGE BANNER */
+.age-banner {
+  background: linear-gradient(135deg, #7c3aed, #6366f1);
+  padding: 12px;
+  border-radius: 14px;
+  margin: 20px;
 }
 </style>
 </head>
@@ -213,54 +211,56 @@ body {
 
 <div class="sidebar">
   <img src="gamebox_logo1.png">
-  <button>Homepage</button>
-  <button>Profile</button>
-  <button>Shop</button>
-  <button class="premium">Premium</button>
+  <div class="nav">
+    <button>Homepage</button>
+    <button>Profile</button>
+    <button>Shop</button>
+    <button class="premium">Premium</button>
+  </div>
 </div>
 
 <div class="main">
   <div class="topbar">
-    <input placeholder="Suchen...">
-    <div class="user">
-      <span id="usernameText"></span>
-      <small id="ageTag"></small>
+    <input class="search" placeholder="Search...">
+    <div class="userbox">
+      <span id="username"></span>
+      <span class="badge" id="ageBadge"></span>
+      <button onclick="settings.style.display='flex'">⋯</button>
     </div>
-    <button onclick="openSettings()">...</button>
+  </div>
+
+  <div class="age-banner" id="ageBanner">
+    Age verification required
+    <button onclick="ageModal.style.display='flex'">Continue</button>
   </div>
 </div>
 
 <!-- SETTINGS -->
-<div class="popup" id="settings">
-  <div class="box">
+<div class="modal" id="settings">
+  <div class="card">
     <h2>Settings</h2>
-
-    <div class="banner" id="ageBanner">
-      Age verification required
-      <button onclick="startAgeCheck()">Continue</button>
-    </div>
-
-    <p>Username: <span id="settingsUsername"></span></p>
-    <p>Email: <span id="settingsEmail"></span></p>
-    <p>Alter: <span id="settingsAge"></span> (<span id="settingsChecked"></span>)</p>
-
-    <hr>
-    <input id="newUsername" placeholder="Neuer Username">
-    <input id="confirmPassword" type="password" placeholder="Passwort bestätigen">
-    <button onclick="changeUsername()">Username ändern</button>
-
-    <hr>
     <button onclick="logout()">Logout</button>
-    <button onclick="closeSettings()">Schließen</button>
+    <button onclick="settings.style.display='none'">Close</button>
   </div>
 </div>
 
 <!-- AGE CHECK -->
-<div class="popup" id="agePopup">
-  <div class="box">
-    <h3>Age Verification</h3>
-    <input type="date" id="birthdate">
-    <button onclick="finishAgeCheck()">Verify</button>
+<div class="modal" id="ageModal">
+  <div class="card">
+    <div id="step1">
+      <h3>Age Verification</h3>
+      <p>We must verify your age to comply with regulations.</p>
+      <button onclick="startAgeCheck()">Continue</button>
+    </div>
+
+    <div id="step2" style="display:none;">
+      <input type="date" id="birthdate">
+      <label>
+        <input type="checkbox" id="confirmAge">
+        I confirm this is correct
+      </label>
+      <button onclick="submitAge()">Verify</button>
+    </div>
   </div>
 </div>
 
