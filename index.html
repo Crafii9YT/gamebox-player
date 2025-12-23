@@ -7,17 +7,19 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { 
-    getAuth, 
-    GoogleAuthProvider, 
-    signInWithPopup, 
-    onAuthStateChanged 
+import {
+    getAuth,
+    GoogleAuthProvider,
+    signInWithPopup,
+    signInWithEmailAndPassword,
+    createUserWithEmailAndPassword,
+    onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { 
-    getFirestore, 
-    doc, 
-    getDoc, 
-    setDoc 
+import {
+    getFirestore,
+    doc,
+    getDoc,
+    setDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -31,26 +33,42 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
+// 🔵 GOOGLE LOGIN
 window.googleLogin = async () => {
-    try {
-        await signInWithPopup(auth, provider);
-    } catch (e) {
-        msg.textContent = "❌ Login fehlgeschlagen";
-    }
+    await signInWithPopup(auth, provider);
 };
 
-window.saveUsername = async () => {
-    const username = usernameInput.value.trim();
-    if (!username) return;
+// ✉️ EMAIL LOGIN
+window.emailLogin = async () => {
+    await signInWithEmailAndPassword(
+        auth,
+        email.value,
+        password.value
+    );
+};
 
-    const user = auth.currentUser;
-    await setDoc(doc(db, "users", user.uid), {
-        username: username
+// 🆕 REGISTER
+window.register = async () => {
+    await createUserWithEmailAndPassword(
+        auth,
+        email.value,
+        password.value
+    );
+};
+
+// 👤 USERNAME SPEICHERN
+window.saveUsername = async () => {
+    const name = username.value.trim();
+    if (!name) return;
+
+    await setDoc(doc(db, "users", auth.currentUser.uid), {
+        username: name
     });
 
-    showWelcome(username);
+    window.location.href = "home.html";
 };
 
+// 🔍 LOGIN CHECK
 onAuthStateChanged(auth, async (user) => {
     if (!user) return;
 
@@ -58,19 +76,12 @@ onAuthStateChanged(auth, async (user) => {
     const snap = await getDoc(ref);
 
     if (snap.exists()) {
-        showWelcome(snap.data().username);
+        window.location.href = "home.html";
     } else {
         loginBox.style.display = "none";
         usernameBox.style.display = "block";
     }
 });
-
-function showWelcome(username) {
-    loginBox.style.display = "none";
-    usernameBox.style.display = "none";
-    welcomeBox.style.display = "block";
-    welcomeName.textContent = username;
-}
 </script>
 
 <style>
@@ -87,51 +98,56 @@ body {
 .box {
     background: #1c1c28;
     padding: 30px;
-    width: 320px;
-    border-radius: 12px;
-    box-shadow: 0 0 30px rgba(0,0,0,.6);
+    width: 340px;
+    border-radius: 14px;
     text-align: center;
+    box-shadow: 0 0 30px rgba(0,0,0,.6);
 }
-button {
-    width: 100%;
-    padding: 10px;
-    border: none;
-    border-radius: 6px;
-    background: #4f46e5;
-    color: white;
-    font-weight: bold;
-    cursor: pointer;
-}
-input {
+input, button {
     width: 100%;
     padding: 10px;
     margin-top: 10px;
     border-radius: 6px;
     border: none;
+}
+input {
     background: #2a2a3d;
     color: white;
 }
-.hidden { display: none; }
+button {
+    background: #4f46e5;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+}
+.alt {
+    background: #374151;
+}
 </style>
 </head>
 
 <body>
 
+<!-- LOGIN -->
 <div class="box" id="loginBox">
     <h1>GameBox</h1>
+
+    <input id="email" type="email" placeholder="E-Mail">
+    <input id="password" type="password" placeholder="Passwort">
+
+    <button onclick="emailLogin()">Anmelden</button>
+    <button class="alt" onclick="register()">Registrieren</button>
+
+    <hr style="margin:15px 0;border-color:#333">
+
     <button onclick="googleLogin()">Mit Google anmelden</button>
-    <div id="msg"></div>
 </div>
 
-<div class="box hidden" id="usernameBox">
+<!-- USERNAME -->
+<div class="box" id="usernameBox" style="display:none;">
     <h2>Username wählen</h2>
-    <input id="usernameInput" placeholder="Dein Username">
-    <button onclick="saveUsername()">Speichern</button>
-</div>
-
-<div class="box hidden" id="welcomeBox">
-    <h2>Willkommen</h2>
-    <h1 id="welcomeName"></h1>
+    <input id="username" placeholder="Dein Username">
+    <button onclick="saveUsername()">Weiter</button>
 </div>
 
 </body>
