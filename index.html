@@ -1,121 +1,137 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <title>GameBox Login</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<title>GameBox Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- Firebase -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } 
-        from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { 
+    getAuth, 
+    GoogleAuthProvider, 
+    signInWithPopup, 
+    onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { 
+    getFirestore, 
+    doc, 
+    getDoc, 
+    setDoc 
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyDulFQbzyizMXE1i7uBD5RVaR6bQa0SEfU",
-            authDomain: "gamebox-681ef.firebaseapp.com",
-            projectId: "gamebox-681ef",
-            appId: "1:000000000000:web:gamebox"
-        };
+const firebaseConfig = {
+    apiKey: "AIzaSyDulFQbzyizMXE1i7uBD5RVaR6bQa0SEfU",
+    authDomain: "gamebox-681ef.firebaseapp.com",
+    projectId: "gamebox-681ef"
+};
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const provider = new GoogleAuthProvider();
 
-        window.login = async () => {
-            const email = emailInput.value;
-            const password = passwordInput.value;
-            msg.textContent = "Anmelden...";
-            try {
-                await signInWithEmailAndPassword(auth, email, password);
-                msg.textContent = "✅ Erfolgreich angemeldet!";
-            } catch (e) {
-                msg.textContent = "❌ " + e.message;
-            }
-        };
+window.googleLogin = async () => {
+    try {
+        await signInWithPopup(auth, provider);
+    } catch (e) {
+        msg.textContent = "❌ Login fehlgeschlagen";
+    }
+};
 
-        window.register = async () => {
-            const email = emailInput.value;
-            const password = passwordInput.value;
-            msg.textContent = "Registrieren...";
-            try {
-                await createUserWithEmailAndPassword(auth, email, password);
-                msg.textContent = "🎉 Account erstellt!";
-            } catch (e) {
-                msg.textContent = "❌ " + e.message;
-            }
-        };
-    </script>
+window.saveUsername = async () => {
+    const username = usernameInput.value.trim();
+    if (!username) return;
 
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: linear-gradient(135deg, #1e1e2f, #121218);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-        }
+    const user = auth.currentUser;
+    await setDoc(doc(db, "users", user.uid), {
+        username: username
+    });
 
-        .box {
-            background: #1c1c28;
-            padding: 30px;
-            border-radius: 12px;
-            width: 320px;
-            box-shadow: 0 0 25px rgba(0,0,0,0.5);
-            text-align: center;
-        }
+    showWelcome(username);
+};
 
-        h1 {
-            margin-bottom: 20px;
-        }
+onAuthStateChanged(auth, async (user) => {
+    if (!user) return;
 
-        input {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 12px;
-            border: none;
-            border-radius: 6px;
-            background: #2a2a3d;
-            color: white;
-        }
+    const ref = doc(db, "users", user.uid);
+    const snap = await getDoc(ref);
 
-        button {
-            width: 100%;
-            padding: 10px;
-            border: none;
-            border-radius: 6px;
-            background: #4f46e5;
-            color: white;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 8px;
-        }
+    if (snap.exists()) {
+        showWelcome(snap.data().username);
+    } else {
+        loginBox.style.display = "none";
+        usernameBox.style.display = "block";
+    }
+});
 
-        button:hover {
-            background: #6366f1;
-        }
+function showWelcome(username) {
+    loginBox.style.display = "none";
+    usernameBox.style.display = "none";
+    welcomeBox.style.display = "block";
+    welcomeName.textContent = username;
+}
+</script>
 
-        .msg {
-            margin-top: 12px;
-            font-size: 14px;
-            min-height: 20px;
-        }
-    </style>
+<style>
+body {
+    margin: 0;
+    background: linear-gradient(135deg, #1e1e2f, #121218);
+    font-family: Arial, sans-serif;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+.box {
+    background: #1c1c28;
+    padding: 30px;
+    width: 320px;
+    border-radius: 12px;
+    box-shadow: 0 0 30px rgba(0,0,0,.6);
+    text-align: center;
+}
+button {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    background: #4f46e5;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+}
+input {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 6px;
+    border: none;
+    background: #2a2a3d;
+    color: white;
+}
+.hidden { display: none; }
+</style>
 </head>
+
 <body>
 
-<div class="box">
+<div class="box" id="loginBox">
     <h1>GameBox</h1>
+    <button onclick="googleLogin()">Mit Google anmelden</button>
+    <div id="msg"></div>
+</div>
 
-    <input id="emailInput" type="email" placeholder="E-Mail">
-    <input id="passwordInput" type="password" placeholder="Passwort">
+<div class="box hidden" id="usernameBox">
+    <h2>Username wählen</h2>
+    <input id="usernameInput" placeholder="Dein Username">
+    <button onclick="saveUsername()">Speichern</button>
+</div>
 
-    <button onclick="login()">Anmelden</button>
-    <button onclick="register()">Registrieren</button>
-
-    <div class="msg" id="msg"></div>
+<div class="box hidden" id="welcomeBox">
+    <h2>Willkommen</h2>
+    <h1 id="welcomeName"></h1>
 </div>
 
 </body>
