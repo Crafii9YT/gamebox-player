@@ -56,10 +56,22 @@ window.register = async () => {
     );
 };
 
-// 👤 USERNAME SPEICHERN
+// 👤 USERNAME SPEICHERN (RESERVIERTE NAMEN)
 window.saveUsername = async () => {
     const name = username.value.trim();
     if (!name) return;
+
+    const forbiddenNames = ["crafii9", "crafii9yt"];
+    const allowedEmail = "crafiii60@gmail.com";
+    const userEmail = auth.currentUser.email.toLowerCase();
+
+    if (
+        forbiddenNames.includes(name.toLowerCase()) &&
+        userEmail !== allowedEmail
+    ) {
+        alert("Dieser Username ist reserviert.");
+        return;
+    }
 
     await setDoc(doc(db, "users", auth.currentUser.uid), {
         username: name
